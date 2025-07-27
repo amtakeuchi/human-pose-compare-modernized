@@ -4,7 +4,8 @@ This project compares human poses in videos using MediaPipe for pose detection a
 
 ## Features
 - Extracts 17 keypoints per frame using MediaPipe
-- Compares two videos (or a video and a reference) for pose similarity
+- Compares videos against stored reference actions
+- Supports multiple actions in a single lookup table
 - Simple, modern, and easy to use
 
 ## Requirements
@@ -23,31 +24,68 @@ pip install -r requirements.txt
 
 ## Usage
 
-### 1. Extract Keypoints and Create Lookup Table
-Extract pose keypoints from a reference video and save as a lookup table:
-```bash
-python3 keypoints_from_video.py
-```
-- This will process `test.mp4` and create `lookup.pickle` by default.
-- You can edit the script to use your own video file.
+### 1. Create Reference Actions
+Extract pose keypoints from reference videos and save as actions:
 
-### 2. Compare a New Video to the Lookup Table
-Compare a new video to the reference lookup table:
 ```bash
-python3 start_here.py
+# Create a reference action
+python3 keypoints_from_video.py --video punch_video.mp4 --action "punch" --lookup actions.pickle
+
+# Add more actions to the same lookup table
+python3 keypoints_from_video.py --video kick_video.mp4 --action "kick" --lookup actions.pickle
+python3 keypoints_from_video.py --video jump_video.mp4 --action "jump" --lookup actions.pickle
 ```
-- By default, compares `test.mp4` to `lookup.pickle`.
-- Edit `start_here.py` to use your own files if needed.
+
+### 2. Compare a Video Against Actions
+
+#### Compare against a specific action:
+```bash
+python3 start_here.py --video test.mp4 --lookup actions.pickle --action "punch"
+```
+
+#### Compare against all available actions:
+```bash
+python3 start_here.py --video test.mp4 --lookup actions.pickle --all
+```
+
+#### Simple comparison (backward compatibility):
+```bash
+python3 start_here.py --video test.mp4 --lookup lookup.pickle
+```
 
 ### Output
-- Prints a similarity score (0-100%) and a match status.
+- Prints similarity scores (0-100%) and match status
+- Shows pose mapping visualization
+- When comparing against all actions, ranks them by similarity
+
+## Example Workflow
+
+1. **Create reference actions:**
+   ```bash
+   python3 keypoints_from_video.py --video punch.mp4 --action "punch" --lookup actions.pickle
+   python3 keypoints_from_video.py --video kick.mp4 --action "kick" --lookup actions.pickle
+   ```
+
+2. **Test a new video:**
+   ```bash
+   python3 start_here.py --video test.mp4 --lookup actions.pickle --all
+   ```
+
+3. **Example output:**
+   ```
+   === Results (All Actions) ===
+   punch: 85.23%
+   kick: 12.45%
+   
+   Best match: punch (85.23%)
+   ```
 
 ## File Structure
 - `pose.py` — MediaPipe-based pose extraction
-- `keypoints_from_video.py` — Extracts keypoints and creates lookup table
-- `start_here.py` — Compares a video to the lookup table
+- `keypoints_from_video.py` — Extracts keypoints and creates action lookup tables
+- `start_here.py` — Compares videos against actions
 - `requirements.txt` — Only modern, minimal dependencies
-- `lookup.pickle` — Generated lookup table (after running extraction)
+- `actions.pickle` — Generated action lookup table
 - `test.mp4` — Example video (replace with your own)
 
 ## No TensorFlow, No Legacy Code
@@ -56,6 +94,7 @@ All TensorFlow, posenet, and legacy files have been removed. This repo is now cl
 ## Troubleshooting
 - Make sure you are using Python 3.12 and have activated your virtual environment.
 - If you encounter MediaPipe or OpenCV errors, ensure your dependencies are up to date.
+- Use `--no-viz` flag to disable visualization if you don't need it.
 
 ## License
 MIT
