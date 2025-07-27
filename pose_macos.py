@@ -168,16 +168,31 @@ class PoseMacOS:
         max_x = float('-inf')
         max_y = float('-inf')
         
-        for i in range(0, len(coords), 2):
-            x, y = coords[i+1], coords[i]  # x, y coordinates
-            if x < min_x:
-                min_x = x
-            if x > max_x:
-                max_x = x
-            if y < min_y:
-                min_y = y
-            if y > max_y:
-                max_y = y
+        # Handle different input formats
+        if isinstance(coords, list):
+            # If coords is a list of [x, y] pairs
+            for coord in coords:
+                x, y = coord[0], coord[1]
+                if x < min_x:
+                    min_x = x
+                if x > max_x:
+                    max_x = x
+                if y < min_y:
+                    min_y = y
+                if y > max_y:
+                    max_y = y
+        else:
+            # If coords is a flat list [y1, x1, y2, x2, ...]
+            for i in range(0, len(coords), 2):
+                x, y = coords[i+1], coords[i]  # x, y coordinates
+                if x < min_x:
+                    min_x = x
+                if x > max_x:
+                    max_x = x
+                if y < min_y:
+                    min_y = y
+                if y > max_y:
+                    max_y = y
                 
         return [(int(min_x), int(min_y)), (int(max_x), int(min_y)), 
                 (int(max_x), int(max_y)), (int(min_x), int(max_y))]
