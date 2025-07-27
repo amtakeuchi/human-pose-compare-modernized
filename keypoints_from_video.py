@@ -1,73 +1,72 @@
-import tensorflow as tf
 import cv2
-import time
-import math
-import numpy 
 import numpy as np
-import posenet
-from pose import Pose
-from score import Score
 import pickle
-import argparse
+from pose import PoseDetector
 
-#USAGE : python3 keypoints_from_video.py --activity "punch - side" --video "test.mp4" 
+def extract_keypoints_from_video(video_path, output_path=None):
+    """
+    Extract pose keypoints from video and save to pickle file
+    Args:
+        video_path: Path to input video
+        output_path: Path for output pickle file (optional)
+    Returns:
+        Dictionary with frame keypoints
+    """
+    pose_detector = PoseDetector()
+    cap = cv2.VideoCapture(video_path)
+    
+    frame_keypoints = {}
+    frame_count = 0
+    
+    print(f"Processing video: {video_path}")
+    
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        # Extract pose keypoints
+        keypoints = pose_detector.getpoints(frame)
+        
+        # Store keypoints for this frame
+        frame_keypoints[frame_count] = keypoints
+        
+        frame_count += 1
+        
+        if frame_count % 30 == 0:  # Print progress every 30 frames
+            print(f"Processed {frame_count} frames...")
+    
+    cap.release()
+    
+    print(f"Total frames processed: {frame_count}")
+    
+    # Save to pickle file if output path provided
+    if output_path:
+        with open(output_path, 'wb') as f:
+            pickle.dump(frame_keypoints, f)
+        print(f"Keypoints saved to: {output_path}")
+    
+    return frame_keypoints
 
-ap = argparse.ArgumentParser()
-ap.add_argument("-a", "--activity", required=True,
-	help="activity to be recorder")
-ap.add_argument("-v", "--video", required=True,
-	help="video file from which keypoints are to be extracted")
-ap.add_argument("-l", "--lookup", default="lookup_new.pickle",
-	help="The pickle file to dump the lookup table")
-args = vars(ap.parse_args())
-
-
-
-def main():
-	a = Pose()
-	b = []
-	c = {}
-	
-	
-	with tf.Session() as sess:
-		model_cfg, model_outputs = posenet.load_model(101, sess)
-		
-		cap = cv2.VideoCapture(args["video"])
-		i = 1
-
-		if cap.isOpened() is False:
-			print("error in opening video")
-		while cap.isOpened():
-			ret_val, image = cap.read()
-			if ret_val:
-				image = cv2.resize(image,(372,495))			
-				input_points,input_black_image = a.getpoints_vis(image,sess,model_cfg,model_outputs)
-				input_points = input_points[0:34]
-				print(input_points)
-				input_new_coords = a.roi(input_points)
-				input_new_coords = input_new_coords[0:34]
-				input_new_coords = np.asarray(input_new_coords).reshape(17,2)
-				b.append(input_new_coords)
-				cv2.imshow("black", input_black_image)
-				cv2.waitKey(1)
-				i = i + 1
-			else:
-				break
-		cap.release()
-		
-
-		b = np.array(b)
-		
-		cv2.destroyAllWindows
-		print(b)
-		print(b.shape)
-		print("Lookup Table Created")
-		c[args["activity"]] = b
-		f = open(args["lookup"],'wb')
-		pickle.dump(c,f)
-		# pickle.dump()
+def create_lookup_table(video_path, output_path="lookup.pickle"):
+    """
+    Create a lookup table from video keypoints
+    Args:
+        video_path: Path to video file
+        output_path: Output pickle file path
+    """
+    keypoints = extract_keypoints_from_video(video_path, output_path)
+    return keypoints
 
 if __name__ == "__main__":
-	main()
+    # Example usage
+    video_file = "test.mp4"  # Change to your video file
+    lookup_file = "lookup.pickle"
+    
+    try:
+        keypoints = create_lookup_table(video_file, lookup_file)
+        print(f"Successfully created lookup table with {len(keypoints)} frames")
+    except Exception as e:
+        print(f"Error processing video: {e}")
 
 

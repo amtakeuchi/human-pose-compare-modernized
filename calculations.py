@@ -1,51 +1,108 @@
-
-import tensorflow as tf
-import pickle
 import cv2
 import numpy as np
-import posenet
-from pose import Pose
-from score import Score
-from dtaidistance import dtw
+import pickle
+from pose import PoseDetector
 
+def calculate_similarity(pose1, pose2):
+    """
+    Calculate similarity between two pose sequences using Euclidean distance
+    Args:
+        pose1: First pose sequence (numpy array)
+        pose2: Second pose sequence (numpy array)
+    Returns:
+        Similarity score (0-1, where 1 is identical)
+    """
+    # Ensure poses are 2D arrays
+    if len(pose1.shape) == 3:  # (frames, 17, 2)
+        pose1_2d = pose1.reshape(-1, 2)
+    else:  # (frames * 17, 2)
+        pose1_2d = pose1.reshape(-1, 2)
+    
+    if len(pose2.shape) == 3:  # (frames, 17, 2)
+        pose2_2d = pose2.reshape(-1, 2)
+    else:  # (frames * 17, 2)
+        pose2_2d = pose2.reshape(-1, 2)
+    
+    # Ensure arrays are finite and not empty
+    if pose1_2d.size == 0 or pose2_2d.size == 0:
+        return 0.0
+    
+    # Remove any NaN or infinite values
+    pose1_2d = pose1_2d[np.isfinite(pose1_2d).all(axis=1)]
+    pose2_2d = pose2_2d[np.isfinite(pose2_2d).all(axis=1)]
+    
+    if pose1_2d.size == 0 or pose2_2d.size == 0:
+        return 0.0
+    
+    try:
+        # Calculate average Euclidean distance between corresponding points
+        # Use the shorter sequence length to avoid index errors
+        min_length = min(len(pose1_2d), len(pose2_2d))
+        
+        if min_length == 0:
+            return 0.0
+        
+        # Calculate distances for each corresponding point
+        distances = []
+        for i in range(min_length):
+            dist = np.linalg.norm(pose1_2d[i] - pose2_2d[i])
+            distances.append(dist)
+        
+        # Calculate average distance
+        avg_distance = np.mean(distances)
+        
+        # Normalize to similarity score (0-1)
+        # Assuming maximum reasonable distance is 1000 pixels
+        max_distance = 1000.0
+        similarity = max(0, 1 - (avg_distance / max_distance))
+        
+        return similarity
+    except Exception as e:
+        print(f"Similarity calculation error: {e}")
+        return 0.0
 
-class get_Score(object):
-	def __init__(self, lookup='lookup.pickle'):
-		self.a = Pose()
-		self.s = Score()
-		self.b = pickle.load(open(lookup, 'rb'))
-		self.input_test = []
+def process_video(video_path, pose_detector):
+    """
+    Process video and extract pose keypoints
+    Args:
+        video_path: Path to video file
+        pose_detector: PoseDetector instance
+    Returns:
+        List of pose keypoints for each frame
+    """
+    cap = cv2.VideoCapture(video_path)
+    poses = []
+    
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+            
+        # Extract pose keypoints
+        keypoints = pose_detector.getpoints(frame)
+        # Reshape to 17x2 array
+        pose_2d = keypoints.reshape(17, 2)
+        poses.append(pose_2d)
+    
+    cap.release()
+    return np.array(poses)
 
-	def get_action_coords_from_dict(self,action):
-			for (k,v) in self.b.items():
-				if k==action:
-					(model_array,no_of_frames) = (v,v.shape[0])
-			return model_array,no_of_frames
-	
-	def calculate_Score(self,video,action):
-		with tf.Session() as sess:
-			model_cfg, model_outputs = posenet.load_model(101, sess)
-			model_array,j = self.get_action_coords_from_dict(action)
-			cap = cv2.VideoCapture(video)
-			i = 0
-			if cap.isOpened() is False:
-				print("error in opening video")
-			while cap.isOpened():
-				ret_val, image = cap.read()
-				if ret_val:         
-					input_points= self.a.getpoints(cv2.resize(image,(372,495)),sess,model_cfg,model_outputs)
-					input_new_coords = np.asarray(self.a.roi(input_points)[0:34]).reshape(17,2)
-					self.input_test.append(input_new_coords)
-					i = i + 1
-				else:
-					break
-			cap.release()
-			final_score,score_list = self.s.compare(np.asarray(self.input_test),np.asarray(model_array),j,i)
-		return final_score,score_list
-
-
-
-	
-	
-
-
+def compare_poses(video1_path, video2_path):
+    """
+    Compare two videos and return similarity score
+    Args:
+        video1_path: Path to first video
+        video2_path: Path to second video
+    Returns:
+        Similarity score (0-1)
+    """
+    pose_detector = PoseDetector()
+    
+    # Process both videos
+    poses1 = process_video(video1_path, pose_detector)
+    poses2 = process_video(video2_path, pose_detector)
+    
+    # Calculate similarity
+    similarity = calculate_similarity(poses1, poses2)
+    
+    return similarity 
