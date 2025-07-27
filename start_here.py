@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Human Pose Comparison Tool - macOS Version 1.2
-Uses MediaPipe for pose detection and Euclidean similarity
+Uses MediaPipe for pose detection and FastDTW with cosine similarity
 """
 
 import cv2
@@ -55,9 +55,9 @@ def compare_with_lookup(video_path, lookup_path, action_name=None, show_visualiz
         action_data = lookup_data[action_name]
         lookup_poses = []
         for frame_num in sorted(action_data.keys()):
-            keypoints = action_data[frame_num]
-            pose_2d = keypoints.reshape(17, 2)
-            lookup_poses.append(pose_2d)
+            keypoints = action_data[frame_num]  # 99-element array (33 points * 3 coordinates)
+            # Keep as 99-element array for the new format
+            lookup_poses.append(keypoints)
         lookup_poses = np.array(lookup_poses)
         
         print(f"Comparing against action: {action_name}")
@@ -66,8 +66,14 @@ def compare_with_lookup(video_path, lookup_path, action_name=None, show_visualiz
         lookup_poses = []
         for frame_num in sorted(lookup_data.keys()):
             keypoints = lookup_data[frame_num]
-            pose_2d = keypoints.reshape(17, 2)
-            lookup_poses.append(pose_2d)
+            # Handle both old (34-element) and new (99-element) formats
+            if len(keypoints) == 34:
+                # Old format: reshape to 17x2 array
+                pose_2d = keypoints.reshape(17, 2)
+                lookup_poses.append(pose_2d)
+            else:
+                # New format: keep as 99-element array
+                lookup_poses.append(keypoints)
         lookup_poses = np.array(lookup_poses)
         print("Comparing against simple lookup table")
     
@@ -98,8 +104,14 @@ def compare_all_actions(video_path, lookup_path, show_visualization=False):
         lookup_poses = []
         for frame_num in sorted(action_data.keys()):
             keypoints = action_data[frame_num]
-            pose_2d = keypoints.reshape(17, 2)
-            lookup_poses.append(pose_2d)
+            # Handle both old (34-element) and new (99-element) formats
+            if len(keypoints) == 34:
+                # Old format: reshape to 17x2 array
+                pose_2d = keypoints.reshape(17, 2)
+                lookup_poses.append(pose_2d)
+            else:
+                # New format: keep as 99-element array
+                lookup_poses.append(keypoints)
         lookup_poses = np.array(lookup_poses)
         
         similarity = calculate_similarity(input_poses, lookup_poses)
@@ -122,7 +134,7 @@ def main():
     args = parser.parse_args()
     
     print("=== Human Pose Comparison Tool - macOS Version 1.2 ===")
-    print("Using MediaPipe for pose detection")
+    print("Using MediaPipe for pose detection with FastDTW and cosine similarity")
     print()
     print(f"Input video: {args.video}")
     print(f"Lookup table: {args.lookup}")
